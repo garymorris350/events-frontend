@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { listEvents } from "@/lib/api";
-
-type Event = { id: string; title: string; date: string; location: string };
+import Link from "next/link";
+import { listEvents, type Event } from "@/lib/api";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -17,8 +16,11 @@ export default function EventsPage() {
         setError(null);
         const data = await listEvents();
         if (!cancelled) setEvents(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message ?? "Failed to load events");
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Failed to load events";
+          setError(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -37,16 +39,7 @@ export default function EventsPage() {
         </h1>
 
         {loading ? (
-          <div className="space-y-4">
-            <div className="h-24 rounded-lg bg-white shadow-sm p-6">
-              <div className="h-5 w-1/3 bg-gray-200 rounded mb-3 animate-pulse" />
-              <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
-            </div>
-            <div className="h-24 rounded-lg bg-white shadow-sm p-6">
-              <div className="h-5 w-1/4 bg-gray-200 rounded mb-3 animate-pulse" />
-              <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
+          <p className="text-center">Loading…</p>
         ) : error ? (
           <p className="text-center text-red-600">Error: {error}</p>
         ) : events.length > 0 ? (
@@ -60,14 +53,15 @@ export default function EventsPage() {
                   {event.title}
                 </h2>
                 <p className="text-gray-600 mb-3">
-                  {event.date} — {event.location}
+                  {/* If your API doesn’t return a `date`, format start/end */}
+                  {new Date(event.start).toLocaleDateString()} — {event.location}
                 </p>
-                <a
+                <Link
                   href={`/events/${event.id}`}
                   className="inline-block text-blue-600 font-medium hover:underline"
                 >
                   View details →
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -76,12 +70,12 @@ export default function EventsPage() {
         )}
 
         <div className="mt-10 text-center">
-          <a
+          <Link
             href="/admin"
             className="text-sm text-gray-500 hover:text-gray-700 hover:underline"
           >
             Admin: Create Event
-          </a>
+          </Link>
         </div>
       </div>
     </div>

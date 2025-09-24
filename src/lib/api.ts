@@ -1,53 +1,94 @@
+// src/lib/api.ts
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL!; // e.g. http://localhost:10000
 
-export async function listEvents() {
+export type Event = {
+  id: string;
+  title: string;
+  description: string;
+  start: string;   // ISO string
+  end: string;     // ISO string
+  location: string;
+  priceType?: string;
+  isPaid?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CreateEventInput = {
+  title: string;
+  description: string;
+  start: string;    // ISO string
+  end: string;      // ISO string
+  location: string;
+};
+
+export type SignupInput = {
+  eventId: string;
+  name: string;
+  email: string;
+  amountPence?: number;
+};
+
+export async function listEvents(): Promise<Event[]> {
   const r = await fetch(`${BASE}/events`, { cache: "no-store" });
   if (!r.ok) throw new Error("Failed to load events");
   const data = await r.json();
-  return Array.isArray(data) ? data : data.events;
+  return Array.isArray(data) ? (data as Event[]) : (data.events as Event[]);
 }
 
-export async function getEvent(id: string) {
+export async function getEvent(id: string): Promise<Event> {
   const r = await fetch(`${BASE}/events/${id}`, { cache: "no-store" });
   if (!r.ok) throw new Error("Not found");
-  return await r.json();
+  return (await r.json()) as Event;
 }
 
-export async function createSignup(payload: { eventId: string; name: string; email: string; amountPence?: number }) {
+export async function createSignup(payload: SignupInput) {
   const r = await fetch(`${BASE}/signups`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!r.ok) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.error ? JSON.stringify(e.error) : "Signup failed");
+    let message = "Signup failed";
+    try {
+      const e = await r.json();
+      if (e?.error) message = typeof e.error === "string" ? e.error : JSON.stringify(e.error);
+    } catch {}
+    throw new Error(message);
   }
-  return await r.json();
+  return r.json();
 }
 
-export async function startCheckout(eventTitle: string, amountPence: number) {
+export async function startCheckout(eventTitle: string, amountPence: number): Promise<{ url: string }> {
   const r = await fetch(`${BASE}/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ eventTitle, amountPence }),
   });
   if (!r.ok) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.error ? JSON.stringify(e.error) : "Checkout failed");
+    let message = "Checkout failed";
+    try {
+      const e = await r.json();
+      if (e?.error) message = typeof e.error === "string" ? e.error : JSON.stringify(e.error);
+    } catch {}
+    throw new Error(message);
   }
-  return (await r.json()) as { url: string };
+  return r.json() as Promise<{ url: string }>;
 }
 
-export async function createEvent(payload: any, adminPass: string) {
+export async function createEvent(payload: CreateEventInput, adminPass: string): Promise<Event> {
   const r = await fetch(`${BASE}/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-admin-passcode": adminPass },
     body: JSON.stringify(payload),
   });
   if (!r.ok) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.error ? JSON.stringify(e.error) : "Create event failed");
+    let message = "Create event failed";
+    try {
+      const e = await r.json();
+      if (e?.error) message = typeof e.error === "string" ? e.error : JSON.stringify(e.error);
+    } catch {}
+    throw new Error(message);
   }
-  return await r.json();
+  return (await r.json()) as Event;
 }
