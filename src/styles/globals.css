@@ -1,4 +1,8 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* your global tweaks here */
-html, body { height: 100%; }
+/* Your custom global styles below */
+html, body {
+  height: 100%;
+}
