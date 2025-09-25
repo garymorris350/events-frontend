@@ -1,6 +1,7 @@
+// src/pages/events/[id].tsx
 import { useRouter } from "next/router";
 import { useEffect, useState, FormEvent } from "react";
-import { createSignup, getEvent, type Event } from "@/lib/api";
+import { getEvent, createSignup, type Event } from "@/lib/api";
 import { googleCalUrl } from "@/lib/calendar";
 
 type FirestoreTimestampish = { _seconds: number } | string | Date;
@@ -14,90 +15,112 @@ function toDate(v: FirestoreTimestampish): Date {
   return new Date(String(v));
 }
 
-export default function EventDetail() {
+export default function EventDetailPage() {
   const router = useRouter();
   const { id } = (router.query as { id?: string }) || {};
-  const [data, setData] = useState<Event | null>(null);
+
+  const [event, setEvent] = useState<Event | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       try {
         const d = await getEvent(id);
-        setData(d);
+        setEvent(d);
       } catch {
         setMsg("Event not found");
       }
     })();
   }, [id]);
 
-  if (!data) {
+  // ✅ early return ensures below code always has a non-null event
+  if (!event) {
     return <main className="max-w-xl mx-auto p-6">{msg || "Loading…"}</main>;
   }
 
-  const event: Event = data;
-  const start = toDate((event as any).start);
-  const end = toDate((event as any).end);
+  const e: Event = event; // alias to satisfy TS narrowing
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  const start = toDate(e.start);
+  const end = toDate(e.end);
+
+  async function onSubmit(ev: FormEvent<HTMLFormElement>) {
+    ev.preventDefault();
     setMsg("");
+
     try {
-      await createSignup({ eventId: event.id, name, email });
+      setIsSubmitting(true);
+      await createSignup({ eventId: e.id, name, email });
       setMsg("Thanks for signing up!");
       setName("");
       setEmail("");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Signup failed";
       setMsg(message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  // Build calendar URLs
   const googleUrl = googleCalUrl({
-    title: event.title,
-    details: event.description,
-    location: event.location,
+    title: e.title,
+    details: e.description,
+    location: e.location,
     start,
     end,
   });
-  const icsUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/events/${event.id}/ics`;
+  const icsUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/events/${e.id}/ics`;
 
   return (
     <main className="max-w-xl mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-bold">{event.title}</h1>
-      <p>{event.description}</p>
+      <h1 className="text-2xl font-bold">{e.title}</h1>
+      {e.description && <p>{e.description}</p>}
       <p>
         <strong>When:</strong> {start.toLocaleString()} – {end.toLocaleString()}
       </p>
-      <p>
-        <strong>Where:</strong> {event.location}
-      </p>
+      {e.location && (
+        <p>
+          <strong>Where:</strong> {e.location}
+        </p>
+      )}
 
       <form onSubmit={onSubmit} className="space-y-3 border p-4 rounded">
         <div>
-          <label className="block text-sm">Name</label>
+          <label htmlFor="name" className="block text-sm">
+            Name
+          </label>
           <input
+            id="name"
             className="border p-2 w-full"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(ev) => setName(ev.target.value)}
+            autoComplete="name"
             required
           />
         </div>
         <div>
-          <label className="block text-sm">Email</label>
+          <label htmlFor="email" className="block text-sm">
+            Email
+          </label>
           <input
+            id="email"
             type="email"
             className="border p-2 w-full"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(ev) => setEmail(ev.target.value)}
+            autoComplete="email"
             required
           />
         </div>
-        <button className="px-3 py-2 bg-black text-white rounded">Sign Up</button>
+        <button
+          className="px-3 py-2 bg-black text-white rounded disabled:opacity-60"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Submitting…" : "Sign Up"}
+        </button>
         {msg && <p className="text-sm mt-2">{msg}</p>}
       </form>
 

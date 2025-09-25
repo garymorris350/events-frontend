@@ -1,0 +1,7 @@
+{
+  // Use the local TypeScript install from node_modules
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // Tell VS Code to use this config instead of the default tsconfig.json
+  "typescript.project": "tsconfig.playwright.json"
+}
