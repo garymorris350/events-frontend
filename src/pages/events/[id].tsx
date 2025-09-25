@@ -34,12 +34,10 @@ export default function EventDetail() {
     })();
   }, [id]);
 
-  // early return ensures below code only runs when we have data
   if (!data) {
     return <main className="max-w-xl mx-auto p-6">{msg || "Loading…"}</main>;
   }
 
-  // from here on, `event` is guaranteed to be a valid Event
   const event: Event = data;
   const start = toDate((event as any).start);
   const end = toDate((event as any).end);
@@ -58,6 +56,16 @@ export default function EventDetail() {
     }
   }
 
+  // Build calendar URLs
+  const googleUrl = googleCalUrl({
+    title: event.title,
+    details: event.description,
+    location: event.location,
+    start,
+    end,
+  });
+  const icsUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/events/${event.id}/ics`;
+
   return (
     <main className="max-w-xl mx-auto p-6 space-y-4">
       <h1 className="text-2xl font-bold">{event.title}</h1>
@@ -68,21 +76,6 @@ export default function EventDetail() {
       <p>
         <strong>Where:</strong> {event.location}
       </p>
-
-      <a
-        className="inline-block px-3 py-2 border rounded"
-        target="_blank"
-        rel="noreferrer"
-        href={googleCalUrl({
-          title: event.title,
-          details: event.description,
-          location: event.location,
-          start,
-          end,
-        })}
-      >
-        Add to Google Calendar
-      </a>
 
       <form onSubmit={onSubmit} className="space-y-3 border p-4 rounded">
         <div>
@@ -105,8 +98,30 @@ export default function EventDetail() {
           />
         </div>
         <button className="px-3 py-2 bg-black text-white rounded">Sign Up</button>
-        {msg && <p className="text-sm">{msg}</p>}
+        {msg && <p className="text-sm mt-2">{msg}</p>}
       </form>
+
+      {msg === "Thanks for signing up!" && (
+        <div className="space-y-2">
+          <p className="font-medium">Add this event to your calendar:</p>
+          <div className="flex gap-3">
+            <a
+              href={googleUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700"
+            >
+              Google Calendar
+            </a>
+            <a
+              href={icsUrl}
+              className="px-3 py-2 rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
+            >
+              Download .ics
+            </a>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
