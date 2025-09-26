@@ -3,13 +3,14 @@ import { useRouter } from "next/router";
 import { useEffect, useState, FormEvent } from "react";
 import { getEvent, createSignup, type Event } from "@/lib/api";
 import { googleCalUrl } from "@/lib/calendar";
+import Custom404 from "../404"; // ✅ reuse your 404 page
 
 type FirestoreTimestampish = { _seconds: number } | string | Date;
 
 function toDate(v: FirestoreTimestampish): Date {
   if (v instanceof Date) return v;
   if (typeof v === "string") return new Date(v);
-  if (v && typeof v === "object" && "_seconds" in v && typeof v._seconds === "number") {
+  if (v && typeof v === "object" && "_seconds" in v) {
     return new Date(v._seconds * 1000);
   }
   return new Date(String(v));
@@ -20,30 +21,37 @@ export default function EventDetailPage() {
   const { id } = (router.query as { id?: string }) || {};
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       try {
         const d = await getEvent(id);
-        setEvent(d);
+        if (!d) setNotFound(true);
+        else setEvent(d);
       } catch {
-        setMsg("Event not found");
+        setNotFound(true);
       }
     })();
   }, [id]);
 
-  // ✅ early return ensures below code always has a non-null event
-  if (!event) {
-    return <main className="max-w-xl mx-auto p-6">{msg || "Loading…"}</main>;
+  // ✅ Show your custom 404 page if event not found
+  if (notFound) {
+    return <Custom404 />;
   }
 
-  const e: Event = event; // alias to satisfy TS narrowing
+  if (!event) {
+    return <main className="max-w-xl mx-auto p-6">Loading…</main>;
+  }
 
+  const e = event;
   const start = toDate(e.start);
   const end = toDate(e.end);
 
@@ -51,12 +59,26 @@ export default function EventDetailPage() {
     ev.preventDefault();
     setMsg("");
 
+    const newErrors: { name?: string; email?: string } = {};
+    if (!name.trim()) newErrors.name = "Name is required";
+    if (!email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = "Invalid email";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await createSignup({ eventId: e.id, name, email });
       setMsg("Thanks for signing up!");
       setName("");
       setEmail("");
+      setErrors({});
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Signup failed";
       setMsg(message);
@@ -87,7 +109,7 @@ export default function EventDetailPage() {
         </p>
       )}
 
-      <form onSubmit={onSubmit} className="space-y-3 border p-4 rounded">
+      <form onSubmit={onSubmit} noValidate className="space-y-3 border p-4 rounded">
         <div>
           <label htmlFor="name" className="block text-sm">
             Name
@@ -98,8 +120,8 @@ export default function EventDetailPage() {
             value={name}
             onChange={(ev) => setName(ev.target.value)}
             autoComplete="name"
-            required
           />
+          {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
         </div>
         <div>
           <label htmlFor="email" className="block text-sm">
@@ -112,8 +134,8 @@ export default function EventDetailPage() {
             value={email}
             onChange={(ev) => setEmail(ev.target.value)}
             autoComplete="email"
-            required
           />
+          {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
         </div>
         <button
           className="px-3 py-2 bg-black text-white rounded disabled:opacity-60"
@@ -121,7 +143,9 @@ export default function EventDetailPage() {
         >
           {isSubmitting ? "Submitting…" : "Sign Up"}
         </button>
-        {msg && <p className="text-sm mt-2">{msg}</p>}
+        {msg && !errors.name && !errors.email && (
+          <p className="text-sm mt-2">{msg}</p>
+        )}
       </form>
 
       {msg === "Thanks for signing up!" && (

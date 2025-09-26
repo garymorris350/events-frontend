@@ -1,14 +1,11 @@
-/// <reference types="node" />
-/// <reference types="@playwright/test" />
-
 import { test, expect } from "@playwright/test";
 
 test.describe("Events Platform", () => {
   test("user can sign up for an event and see calendar options", async ({ page }) => {
-    // Go to homepage where events list is rendered
-    await page.goto("http://localhost:3000/");
+    // Go to homepage
+    await page.goto("/");
 
-    // Click first event link (any link to /events/[id])
+    // Click first event link
     const firstEvent = page.locator("a[href^='/events/']").first();
     await firstEvent.click();
 
