@@ -1,6 +1,8 @@
 // src/lib/api.ts
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL!; // e.g. http://localhost:10000
 
+export type PriceType = "free" | "fixed" | "pay_what_you_feel";
+
 export type Event = {
   id: string;
   title: string;
@@ -8,8 +10,15 @@ export type Event = {
   start: string;   // ISO string
   end: string;     // ISO string
   location: string;
-  priceType?: string;
+  /** optional TMDb link */
+  movieId?: string | null;
+
+  // pricing/capacity (optional; matches backend schema if present)
+  priceType?: PriceType;
+  pricePence?: number | null;
+  capacity?: number | null;
   isPaid?: boolean;
+
   createdAt?: string;
   updatedAt?: string;
 };
@@ -17,9 +26,17 @@ export type Event = {
 export type CreateEventInput = {
   title: string;
   description: string;
-  start: string;    // ISO string
-  end: string;      // ISO string
+  start: string;   // ISO string
+  end: string;     // ISO string
   location: string;
+  /** optional TMDb link */
+  movieId?: string | null;
+
+  // optional pricing fields
+  priceType?: PriceType;
+  pricePence?: number | null;
+  capacity?: number | null;
+  isPaid?: boolean;
 };
 
 export type SignupInput = {
