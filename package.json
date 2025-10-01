@@ -2,19 +2,15 @@
   "name": "events-frontend",
   "version": "0.1.0",
   "private": true,
-"scripts": {
-  "predev": "kill-port 3000 || true",
-  "dev": "next dev -p 3000",
-  "build": "next build",
-  "start": "next start",
-  "lint": "eslint",
-  
-  "test:e2e": "NEXT_PUBLIC_API_BASE_URL=http://localhost:10000 playwright test",
-  
-  "test:e2e:ci": "BASE_URL=https://events-platform-frontend.netlify.app NEXT_PUBLIC_API_BASE_URL=https://events-platform-backend.onrender.com playwright test"
-}
-,
-
+  "scripts": {
+    "predev": "kill-port 3000 || true",
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test:e2e": "NEXT_PUBLIC_API_BASE_URL=http://localhost:10000 playwright test",
+    "test:e2e:ci": "BASE_URL=https://events-platform-frontend.netlify.app NEXT_PUBLIC_API_BASE_URL=https://events-platform-backend.onrender.com playwright test"
+  },
   "dependencies": {
     "autoprefixer": "^10.4.21",
     "next": "^15.5.3",
@@ -25,8 +21,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",
-    "@types/node": "^20.19.17",
-    "@types/react": "^18.3.24",
+    "@types/node": "^22.18.8",
+    "@types/react": "^18.3.25",
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",

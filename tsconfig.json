@@ -27,11 +27,7 @@
       }
     ],
     "skipLibCheck": true,
-    "types": [
-      "node",
-      "react",
-      "react-dom"
-    ],
+    "types": [],
     "allowJs": true
   },
  "include": [
