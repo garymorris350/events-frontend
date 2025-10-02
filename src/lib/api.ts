@@ -1,19 +1,33 @@
 // src/lib/api.ts
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL!; // e.g. http://localhost:10000
 
-export type PriceType = "free" | "fixed" | "pay_what_you_feel";
+// Base URL for your backend API (e.g., http://localhost:10000)
+// Make sure .env.local contains: NEXT_PUBLIC_API_BASE_URL=http://localhost:10000
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL!;
+if (!BASE) {
+  // Helpful during dev if env is missing
+  throw new Error("Missing NEXT_PUBLIC_API_BASE_URL in frontend env (.env.local)");
+}
+
+/* =========================
+   Shared types
+   ========================= */
+
+export type PriceType = "free" | "fixed" | "donation";
 
 export type Event = {
   id: string;
   title: string;
-  description: string;
-  start: string;   // ISO string
-  end: string;     // ISO string
-  location: string;
-  /** optional TMDb link */
+
+  // allow nulls from the API
+  start: string | null;   // ISO or null
+  end: string | null;     // ISO or null
+
+  description?: string;
+  location?: string;
+
   movieId?: string | null;
 
-  // pricing/capacity (optional; matches backend schema if present)
+  // pricing/capacity (optional)
   priceType?: PriceType;
   pricePence?: number | null;
   capacity?: number | null;
@@ -22,6 +36,8 @@ export type Event = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+
 
 export type CreateEventInput = {
   title: string;
@@ -46,6 +62,10 @@ export type SignupInput = {
   amountPence?: number;
 };
 
+/* =========================
+   Events
+   ========================= */
+
 export async function listEvents(): Promise<Event[]> {
   const r = await fetch(`${BASE}/events`, { cache: "no-store" });
   if (!r.ok) throw new Error("Failed to load events");
@@ -58,6 +78,41 @@ export async function getEvent(id: string): Promise<Event> {
   if (!r.ok) throw new Error("Not found");
   return (await r.json()) as Event;
 }
+
+export async function createEvent(
+  payload: CreateEventInput,
+  adminPass: string
+): Promise<Event> {
+  if (!adminPass || !adminPass.trim()) {
+    throw new Error("Missing admin passcode (frontend)");
+  }
+
+  const r = await fetch(`${BASE}/events`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-passcode": adminPass.trim(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!r.ok) {
+    let message = "Create event failed";
+    try {
+      const e = await r.json();
+      if (e?.error)
+        message =
+          typeof e.error === "string" ? e.error : JSON.stringify(e.error);
+    } catch {}
+    throw new Error(message);
+  }
+  return (await r.json()) as Event;
+}
+
+
+/* =========================
+   Signups / Checkout
+   ========================= */
 
 export async function createSignup(payload: SignupInput) {
   const r = await fetch(`${BASE}/signups`, {
@@ -93,19 +148,44 @@ export async function startCheckout(eventTitle: string, amountPence: number): Pr
   return r.json() as Promise<{ url: string }>;
 }
 
-export async function createEvent(payload: CreateEventInput, adminPass: string): Promise<Event> {
-  const r = await fetch(`${BASE}/events`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-admin-passcode": adminPass },
-    body: JSON.stringify(payload),
-  });
-  if (!r.ok) {
-    let message = "Create event failed";
-    try {
-      const e = await r.json();
-      if (e?.error) message = typeof e.error === "string" ? e.error : JSON.stringify(e.error);
-    } catch {}
-    throw new Error(message);
-  }
-  return (await r.json()) as Event;
+/* =========================
+   TMDb (via backend)
+   Endpoints provided by your backend:
+   - GET /tmdb/search?query=...
+   - GET /tmdb/movie/:id
+   ========================= */
+
+export type TmdbSearchHit = {
+  id: number;
+  title: string;
+  releaseDate: string | null;
+  posterPath: string | null;
+};
+
+export async function searchMovies(query: string): Promise<{ results: TmdbSearchHit[] }> {
+  const url = `${BASE}/tmdb/search?query=${encodeURIComponent(query)}`;
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(`searchMovies failed: ${r.status}`);
+  return (await r.json()) as { results: TmdbSearchHit[] };
+}
+
+export type TmdbMovie = {
+  id: number;
+  title: string;
+  overview: string;
+  runtime: number | null;
+  releaseDate: string | null;
+  posterPath: string | null;
+  genres: string[];
+};
+
+export async function fetchMovie(id: string | number): Promise<TmdbMovie> {
+  const r = await fetch(`${BASE}/tmdb/movie/${id}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`fetchMovie failed: ${r.status}`);
+  return (await r.json()) as TmdbMovie;
+}
+
+/** Build a TMDb poster URL when you have posterPath (e.g. '/abc123.jpg') */
+export function tmdbPosterUrl(posterPath: string | null, size: "w185" | "w342" | "w500" = "w342") {
+  return posterPath ? `https://image.tmdb.org/t/p/${size}${posterPath}` : null;
 }

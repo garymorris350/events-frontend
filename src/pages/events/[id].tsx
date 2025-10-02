@@ -1,25 +1,17 @@
 // src/pages/events/[id].tsx
 import { useRouter } from "next/router";
 import { useEffect, useState, FormEvent } from "react";
-import { getEvent, createSignup, type Event } from "@/lib/api";
+import {
+  getEvent,
+  createSignup,
+  type Event,
+  fetchMovie,
+  type TmdbMovie,
+  tmdbPosterUrl,
+} from "@/lib/api";
 import { googleCalUrl } from "@/lib/calendar";
+import { formatDateTime } from "@/lib/dates";
 import Custom404 from "../404";
-//  add TMDb helpers
-const TMDB_BASE = "https://api.themoviedb.org/3";
-const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const posterUrl = (path?: string, size: "w185"|"w342"|"w500" = "w342") =>
-  path ? `https://image.tmdb.org/t/p/${size}${path}` : "";
-
-type FirestoreTimestampish = { _seconds: number } | string | Date;
-
-function toDate(v: FirestoreTimestampish): Date {
-  if (v instanceof Date) return v;
-  if (typeof v === "string") return new Date(v);
-  if (v && typeof v === "object" && "_seconds" in v) {
-    return new Date(v._seconds * 1000);
-  }
-  return new Date(String(v));
-}
 
 export default function EventDetailPage() {
   const router = useRouter();
@@ -28,8 +20,8 @@ export default function EventDetailPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  //  TMDb state
-  const [movie, setMovie] = useState<any | null>(null);
+  // TMDb movie info
+  const [movie, setMovie] = useState<TmdbMovie | null>(null);
   const [movieErr, setMovieErr] = useState<string>("");
 
   const [name, setName] = useState("");
@@ -51,18 +43,12 @@ export default function EventDetailPage() {
     })();
   }, [id]);
 
-  //  fetch TMDb details if event has movieId
   useEffect(() => {
-    if (!event?.movieId || !TMDB_KEY) return;
+    if (!event?.movieId) return;
     (async () => {
       try {
-        setMovieErr("");
-        const r = await fetch(
-          `${TMDB_BASE}/movie/${encodeURIComponent(String(event.movieId))}?api_key=${TMDB_KEY}&language=en-US`
-        );
-        if (!r.ok) throw new Error(`TMDb error ${r.status}`);
-        const data = await r.json();
-        setMovie(data);
+        const m = await fetchMovie(event.movieId as string);
+        setMovie(m);
       } catch (err: any) {
         setMovie(null);
         setMovieErr(err?.message || "Failed to load film info");
@@ -70,16 +56,11 @@ export default function EventDetailPage() {
     })();
   }, [event?.movieId]);
 
-  // Show your custom 404 page if event not found
   if (notFound) return <Custom404 />;
+  if (!event) return <main className="max-w-xl mx-auto p-6">Loading…</main>;
 
-  if (!event) {
-    return <main className="max-w-xl mx-auto p-6">Loading…</main>;
-  }
-
-  const e = event;
-  const start = toDate(e.start);
-  const end = toDate(e.end);
+  // At this point event is guaranteed non-null
+  const e = event!;
 
   async function onSubmit(ev: FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -110,12 +91,18 @@ export default function EventDetailPage() {
     }
   }
 
+  // Calendar URLs with safe fallbacks
+  const startDate = e.start ? new Date(e.start) : new Date();
+  const endDate = e.end
+    ? new Date(e.end)
+    : new Date(startDate.getTime() + 60 * 60 * 1000);
+
   const googleUrl = googleCalUrl({
     title: e.title,
-    details: e.description,
-    location: e.location,
-    start,
-    end,
+    details: e.description ?? "",
+    location: e.location ?? "",
+    start: startDate,
+    end: endDate,
   });
   const icsUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/events/${e.id}/ics`;
 
@@ -125,7 +112,8 @@ export default function EventDetailPage() {
         <h1 className="text-2xl font-bold">{e.title}</h1>
         {e.description && <p>{e.description}</p>}
         <p>
-          <strong>When:</strong> {start.toLocaleString()} – {end.toLocaleString()}
+          <strong>When:</strong> {formatDateTime(e.start)} –{" "}
+          {formatDateTime(e.end)}
         </p>
         {e.location && (
           <p>
@@ -134,44 +122,65 @@ export default function EventDetailPage() {
         )}
       </section>
 
-      {/* Film info (TMDb) */}
+      {/* Film info */}
       {e.movieId && (
         <section className="border-t pt-4">
           <h2 className="text-xl font-semibold">About the Film</h2>
           {movieErr && <p className="text-sm text-red-600 mt-1">{movieErr}</p>}
           {movie ? (
             <div className="mt-3 flex gap-4">
-              {movie.poster_path && (
+              {movie.posterPath && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={posterUrl(movie.poster_path)}
+                  src={tmdbPosterUrl(movie.posterPath) ?? ""}
                   alt={movie.title}
                   className="w-32 rounded"
+                  loading="lazy"
                 />
               )}
               <div>
                 <p className="font-medium">
                   {movie.title}{" "}
-                  {movie.release_date && (
+                  {movie.releaseDate && (
                     <span className="text-gray-600">
-                      ({movie.release_date.slice(0, 4)})
+                      ({movie.releaseDate.slice(0, 4)})
                     </span>
                   )}
                 </p>
-                {movie.overview && <p className="mt-1 text-sm">{movie.overview}</p>}
+                {movie.overview && (
+                  <p className="mt-1 text-sm">{movie.overview}</p>
+                )}
                 <p className="mt-2 text-xs text-gray-500">
-                  Data & images © TMDb — <a className="underline" href="https://www.themoviedb.org/">Powered by TMDb</a>
+                  Data & images © TMDb —{" "}
+                  <a
+                    className="underline"
+                    href="https://www.themoviedb.org/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Powered by TMDb
+                  </a>
                 </p>
               </div>
             </div>
           ) : !movieErr ? (
-            <p className="text-sm text-gray-600 mt-2">Loading film details…</p>
+            <p className="text-sm text-gray-600 mt-2">
+              Loading film details…
+            </p>
           ) : null}
         </section>
       )}
 
-      <form onSubmit={onSubmit} noValidate className="space-y-3 border p-4 rounded">
+      {/* Signup form */}
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="space-y-3 border p-4 rounded"
+      >
         <div>
-          <label htmlFor="name" className="block text-sm">Name</label>
+          <label htmlFor="name" className="block text-sm">
+            Name
+          </label>
           <input
             id="name"
             className="border p-2 w-full"
@@ -182,7 +191,9 @@ export default function EventDetailPage() {
           {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
         </div>
         <div>
-          <label htmlFor="email" className="block text-sm">Email</label>
+          <label htmlFor="email" className="block text-sm">
+            Email
+          </label>
           <input
             id="email"
             type="email"
@@ -191,7 +202,9 @@ export default function EventDetailPage() {
             onChange={(ev) => setEmail(ev.target.value)}
             autoComplete="email"
           />
-          {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
+          {errors.email && (
+            <p className="text-red-500 text-sm">{errors.email}</p>
+          )}
         </div>
         <button
           className="px-3 py-2 bg-black text-white rounded disabled:opacity-60"

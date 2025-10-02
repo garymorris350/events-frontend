@@ -1,14 +1,21 @@
+// src/pages/admin.tsx
 import { useState, ChangeEvent, FormEvent } from "react";
 import Link from "next/link";
-import { createEvent, type CreateEventInput } from "@/lib/api";
+import {
+  createEvent,
+  type CreateEventInput,
+  searchMovies,
+  type TmdbSearchHit,
+} from "@/lib/api";
+import { formatDateTimeShort } from "@/lib/dates";
 
 type FormState = {
   title: string;
   description: string;
   location: string;
-  start: string; // <input type="datetime-local">
-  end: string;   // <input type="datetime-local">
-  movieId?: string; // optional TMDb reference
+  start: string;
+  end: string;
+  movieId?: string;
 };
 
 export default function Admin() {
@@ -21,186 +28,224 @@ export default function Admin() {
     movieId: "",
   });
   const [pass, setPass] = useState("");
-  const [msg, setMsg] = useState("");
-  const [link, setLink] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ start?: string; end?: string; movieId?: string }>({});
+  const [msg, setMsg] = useState<string>("");
 
-  function setField<K extends keyof FormState>(k: K, v: string) {
-    setForm((f) => ({ ...f, [k]: v }));
+  // TMDb search state
+  const [movieQuery, setMovieQuery] = useState("");
+  const [results, setResults] = useState<TmdbSearchHit[]>([]);
+  const [loadingMovies, setLoadingMovies] = useState(false);
+
+  function onChange<K extends keyof FormState>(key: K) {
+    return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value }));
   }
 
-  function validate(): boolean {
-    const next: typeof errors = {};
-    const startMs = form.start ? Date.parse(form.start) : NaN;
-    const endMs = form.end ? Date.parse(form.end) : NaN;
-    if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs <= startMs) {
-      next.end = "End must be after start";
-    }
-    if (form.movieId && form.movieId.trim() && !/^\d+$/.test(form.movieId.trim())) {
-      next.movieId = "Movie ID should be numeric (TMDb id)";
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  }
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setMsg("");
-    setLink("");
 
-    if (!validate()) return;
-
-    const payload: CreateEventInput & { movieId?: string } = {
+    const payload: CreateEventInput = {
       title: form.title.trim(),
       description: form.description.trim(),
       location: form.location.trim(),
-      start: new Date(form.start).toISOString(),
-      end: new Date(form.end).toISOString(),
+      start: form.start,
+      end: form.end,
+      movieId: form.movieId?.trim() || undefined,
     };
-    if (form.movieId?.trim()) payload.movieId = form.movieId.trim();
 
     try {
-      setIsSubmitting(true);
-      const res = await createEvent(payload, pass);
-      setMsg("Event created!");
-      setLink(`/events/${res.id}`);
-      // reset form (keep pass so you can create another quickly)
-      setForm({ title: "", description: "", location: "", start: "", end: "", movieId: "" });
-      setErrors({});
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to create";
-      setMsg(message);
-    } finally {
-      setIsSubmitting(false);
+      await createEvent(payload, pass);
+      setMsg("Event created");
+      setForm({
+        title: "",
+        description: "",
+        location: "",
+        start: "",
+        end: "",
+        movieId: "",
+      });
+      setPass("");
+      setMovieQuery("");
+      setResults([]);
+    } catch (err: any) {
+      setMsg(err?.message || "Failed to create event");
     }
   }
 
-  function onChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    const { name, value } = e.target;
-    setField(name as keyof FormState, value);
+  // TMDb search
+  async function onSearchMovies() {
+    if (!movieQuery.trim()) return;
+    setLoadingMovies(true);
+    try {
+      const { results } = await searchMovies(movieQuery.trim());
+      setResults(results);
+    } catch (err) {
+      console.error("Movie search failed", err);
+      setResults([]);
+    } finally {
+      setLoadingMovies(false);
+    }
   }
 
+  function selectMovie(m: TmdbSearchHit) {
+    setForm((f) => ({ ...f, movieId: String(m.id) }));
+    setMovieQuery(m.title);
+    setResults([]);
+  }
+
+  // Preview helpers
+  function toIsoFromLocal(dt: string) {
+    if (!dt) return "";
+    const d = new Date(dt);
+    return isNaN(d.getTime()) ? "" : d.toISOString();
+  }
+  const previewStart = formatDateTimeShort(toIsoFromLocal(form.start));
+  const previewEnd = formatDateTimeShort(toIsoFromLocal(form.end));
+
+  // Simple frontend validation
+  const valid =
+    form.title.trim().length > 0 &&
+    form.description.trim().length >= 10 &&
+    form.location.trim().length >= 2 &&
+    form.start &&
+    form.end &&
+    pass.trim().length > 0;
+
   return (
-    <main className="max-w-xl mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Admin — Create Event</h1>
+    <main className="max-w-xl mx-auto p-6">
+      <div className="mb-4">
+        <Link href="/" className="text-sm text-gray-500 hover:underline">
+          ← Back to events
+        </Link>
+      </div>
 
-      <form onSubmit={onSubmit} className="space-y-3 border p-4 rounded" noValidate>
+      <h1 className="text-2xl font-bold mb-4">Create Event</h1>
+
+      <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label htmlFor="title" className="block text-sm">Title</label>
+          <label className="block text-sm">Title</label>
           <input
-            id="title"
-            name="title"
             className="border p-2 w-full"
-            placeholder="Title"
-            autoComplete="off"
             value={form.title}
-            onChange={onChange}
-            required
+            onChange={onChange("title")}
           />
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm">Description</label>
+          <label className="block text-sm">Description</label>
           <textarea
-            id="description"
-            name="description"
             className="border p-2 w-full"
-            placeholder="Description"
+            rows={4}
             value={form.description}
-            onChange={onChange}
-            required
+            onChange={onChange("description")}
           />
+          <p className="text-xs text-gray-500">Min 10 characters</p>
         </div>
 
         <div>
-          <label htmlFor="location" className="block text-sm">Location</label>
+          <label className="block text-sm">Location</label>
           <input
-            id="location"
-            name="location"
             className="border p-2 w-full"
-            placeholder="Location"
-            autoComplete="street-address"
             value={form.location}
-            onChange={onChange}
-            required
+            onChange={onChange("location")}
           />
+          <p className="text-xs text-gray-500">Min 2 characters</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="start" className="block text-sm">Start</label>
+            <label className="block text-sm">Start</label>
             <input
-              id="start"
-              name="start"
-              className="border p-2 w-full"
               type="datetime-local"
+              className="border p-2 w-full"
               value={form.start}
-              onChange={onChange}
-              required
+              onChange={onChange("start")}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Preview: {previewStart}
+            </p>
           </div>
+
           <div>
-            <label htmlFor="end" className="block text-sm">End</label>
+            <label className="block text-sm">End</label>
             <input
-              id="end"
-              name="end"
-              className="border p-2 w-full"
               type="datetime-local"
+              className="border p-2 w-full"
               value={form.end}
-              onChange={onChange}
-              aria-invalid={Boolean(errors.end) || undefined}
-              required
+              onChange={onChange("end")}
             />
-            {errors.end && <p className="text-red-500 text-sm mt-1">{errors.end}</p>}
+            <p className="text-xs text-gray-500 mt-1">Preview: {previewEnd}</p>
           </div>
         </div>
 
+        {/* TMDb Search */}
         <div>
-          <label htmlFor="movieId" className="block text-sm">
-            TMDb Movie ID <span className="text-gray-500">(optional)</span>
-          </label>
+          <label className="block text-sm">Search Movie (TMDb)</label>
+          <div className="flex gap-2">
+            <input
+              className="border p-2 flex-grow"
+              value={movieQuery}
+              onChange={(e) => setMovieQuery(e.target.value)}
+              placeholder="Search TMDb..."
+            />
+            <button
+              type="button"
+              onClick={onSearchMovies}
+              className="px-3 py-2 bg-gray-700 text-white rounded"
+            >
+              {loadingMovies ? "..." : "Search"}
+            </button>
+          </div>
+          {results.length > 0 && (
+            <ul className="border mt-2 max-h-40 overflow-y-auto">
+              {results.map((m) => (
+                <li
+                  key={m.id}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onClick={() => selectMovie(m)}
+                >
+                  {m.title} ({m.releaseDate || "n/a"})
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Manual fallback */}
+        <div>
+          <label className="block text-sm">TMDb Movie ID (optional)</label>
           <input
-            id="movieId"
-            name="movieId"
             className="border p-2 w-full"
-            placeholder="e.g. 27205 for Inception"
-            value={form.movieId ?? ""}
-            onChange={onChange}
-            aria-invalid={Boolean(errors.movieId) || undefined}
+            value={form.movieId}
+            onChange={onChange("movieId")}
+            placeholder="e.g., 27205 for Inception"
           />
-          {errors.movieId && <p className="text-red-500 text-sm mt-1">{errors.movieId}</p>}
         </div>
 
         <div>
-          <label htmlFor="adminPass" className="block text-sm">Admin passcode</label>
+          <label className="block text-sm">Admin Passcode</label>
           <input
-            id="adminPass"
+            type="password"
             className="border p-2 w-full"
-            placeholder="Admin passcode"
-            autoComplete="off"
             value={pass}
             onChange={(e) => setPass(e.target.value)}
-            required
           />
+          <p className="text-xs text-gray-500">Required</p>
         </div>
 
         <button
-          className="px-3 py-2 bg-black text-white rounded disabled:opacity-60"
-          disabled={isSubmitting}
+          type="submit"
+          disabled={!valid}
+          className={`px-3 py-2 rounded text-white ${
+            valid
+              ? "bg-black hover:bg-gray-800"
+              : "bg-gray-400 cursor-not-allowed"
+          }`}
         >
-          {isSubmitting ? "Creating…" : "Create"}
+          Create Event
         </button>
 
         {msg && <p className="text-sm mt-2">{msg}</p>}
-        {link && (
-          <p className="text-sm">
-            Event link:{" "}
-            <Link className="underline text-blue-600" href={link}>
-              {link}
-            </Link>
-          </p>
-        )}
       </form>
     </main>
   );

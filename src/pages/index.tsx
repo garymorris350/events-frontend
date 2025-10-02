@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { listEvents, type Event } from "@/lib/api";
+import { formatDateTimeShort } from "@/lib/dates";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -18,7 +19,8 @@ export default function EventsPage() {
         if (!cancelled) setEvents(Array.isArray(data) ? data : []);
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : "Failed to load events";
+          const message =
+            err instanceof Error ? err.message : "Failed to load events";
           setError(message);
         }
       } finally {
@@ -53,8 +55,10 @@ export default function EventsPage() {
                   {event.title}
                 </h2>
                 <p className="text-gray-600 mb-3">
-                  {/* If your API doesn’t return a `date`, format start/end */}
-                  {new Date(event.start).toLocaleDateString()} — {event.location}
+                  {event.start
+                    ? formatDateTimeShort(event.start)
+                    : "Date TBA"}{" "}
+                  — {event.location || "TBA"}
                 </p>
                 <Link
                   href={`/events/${event.id}`}
