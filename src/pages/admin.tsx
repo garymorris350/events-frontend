@@ -1,6 +1,6 @@
-// src/pages/admin.tsx
 import { useState, ChangeEvent, FormEvent } from "react";
 import Link from "next/link";
+import Head from "next/head";
 import {
   createEvent,
   type CreateEventInput,
@@ -112,141 +112,205 @@ export default function Admin() {
     pass.trim().length > 0;
 
   return (
-    <main className="max-w-xl mx-auto p-6">
-      <div className="mb-4">
-        <Link href="/" className="text-sm text-gray-500 hover:underline">
-          ← Back to events
-        </Link>
-      </div>
+    <>
+      <Head>
+        <title>Create Event | FilmHub</title>
+        <meta name="description" content="Admin page for creating new events." />
+      </Head>
 
-      <h1 className="text-2xl font-bold mb-4">Create Event</h1>
-
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm">Title</label>
-          <input
-            className="border p-2 w-full"
-            value={form.title}
-            onChange={onChange("title")}
-          />
+      <main className="max-w-xl mx-auto p-6">
+        <div className="mb-4">
+          <Link
+            href="/"
+            className="text-sm text-gray-600 hover:text-gray-800 hover:underline"
+            aria-label="Back to events page"
+          >
+            ← Back to events
+          </Link>
         </div>
 
-        <div>
-          <label className="block text-sm">Description</label>
-          <textarea
-            className="border p-2 w-full"
-            rows={4}
-            value={form.description}
-            onChange={onChange("description")}
-          />
-          <p className="text-xs text-gray-500">Min 10 characters</p>
-        </div>
+        <h1 className="text-2xl font-bold mb-4">Create Event</h1>
 
-        <div>
-          <label className="block text-sm">Location</label>
-          <input
-            className="border p-2 w-full"
-            value={form.location}
-            onChange={onChange("location")}
-          />
-          <p className="text-xs text-gray-500">Min 2 characters</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={onSubmit} className="space-y-4" aria-label="Create event form">
           <div>
-            <label className="block text-sm">Start</label>
+            <label htmlFor="title" className="block text-sm font-medium">
+              Title
+            </label>
             <input
-              type="datetime-local"
+              id="title"
+              name="title"
               className="border p-2 w-full"
-              value={form.start}
-              onChange={onChange("start")}
+              value={form.title}
+              onChange={onChange("title")}
+              required
+              aria-required="true"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Preview: {previewStart}
+          </div>
+
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              className="border p-2 w-full"
+              rows={4}
+              value={form.description}
+              onChange={onChange("description")}
+              required
+              aria-required="true"
+              aria-describedby="desc-help"
+            />
+            <p id="desc-help" className="text-xs text-gray-700">
+              Min 10 characters
             </p>
           </div>
 
           <div>
-            <label className="block text-sm">End</label>
+            <label htmlFor="location" className="block text-sm font-medium">
+              Location
+            </label>
             <input
-              type="datetime-local"
+              id="location"
+              name="location"
               className="border p-2 w-full"
-              value={form.end}
-              onChange={onChange("end")}
+              value={form.location}
+              onChange={onChange("location")}
+              required
+              aria-required="true"
+              aria-describedby="loc-help"
             />
-            <p className="text-xs text-gray-500 mt-1">Preview: {previewEnd}</p>
+            <p id="loc-help" className="text-xs text-gray-700">Min 2 characters</p>
           </div>
-        </div>
 
-        {/* TMDb Search */}
-        <div>
-          <label className="block text-sm">Search Movie (TMDb)</label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="start" className="block text-sm font-medium">
+                Start
+              </label>
+              <input
+                id="start"
+                name="start"
+                type="datetime-local"
+                className="border p-2 w-full"
+                value={form.start}
+                onChange={onChange("start")}
+                required
+                aria-required="true"
+              />
+              <p className="text-xs text-gray-700 mt-1">Preview: {previewStart}</p>
+            </div>
+
+            <div>
+              <label htmlFor="end" className="block text-sm font-medium">
+                End
+              </label>
+              <input
+                id="end"
+                name="end"
+                type="datetime-local"
+                className="border p-2 w-full"
+                value={form.end}
+                onChange={onChange("end")}
+                required
+                aria-required="true"
+              />
+              <p className="text-xs text-gray-700 mt-1">Preview: {previewEnd}</p>
+            </div>
+          </div>
+
+          {/* TMDb Search */}
+          <div>
+            <label htmlFor="movieQuery" className="block text-sm font-medium">
+              Search Movie (TMDb)
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="movieQuery"
+                name="movieQuery"
+                className="border p-2 flex-grow"
+                value={movieQuery}
+                onChange={(e) => setMovieQuery(e.target.value)}
+                placeholder="Search TMDb..."
+              />
+              <button
+                type="button"
+                onClick={onSearchMovies}
+                className="px-3 py-2 bg-gray-700 text-white rounded"
+                aria-label="Search movies on TMDb"
+              >
+                {loadingMovies ? "..." : "Search"}
+              </button>
+            </div>
+            {results.length > 0 && (
+              <ul className="border mt-2 max-h-40 overflow-y-auto" aria-label="Movie search results">
+                {results.map((m) => (
+                  <li
+                    key={m.id}
+                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => selectMovie(m)}
+                  >
+                    {m.title} ({m.releaseDate || "n/a"})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Manual fallback */}
+          <div>
+            <label htmlFor="movieId" className="block text-sm font-medium">
+              TMDb Movie ID (optional)
+            </label>
             <input
-              className="border p-2 flex-grow"
-              value={movieQuery}
-              onChange={(e) => setMovieQuery(e.target.value)}
-              placeholder="Search TMDb..."
+              id="movieId"
+              name="movieId"
+              className="border p-2 w-full"
+              value={form.movieId}
+              onChange={onChange("movieId")}
+              placeholder="e.g., 27205 for Inception"
             />
-            <button
-              type="button"
-              onClick={onSearchMovies}
-              className="px-3 py-2 bg-gray-700 text-white rounded"
-            >
-              {loadingMovies ? "..." : "Search"}
-            </button>
           </div>
-          {results.length > 0 && (
-            <ul className="border mt-2 max-h-40 overflow-y-auto">
-              {results.map((m) => (
-                <li
-                  key={m.id}
-                  className="p-2 hover:bg-gray-100 cursor-pointer"
-                  onClick={() => selectMovie(m)}
-                >
-                  {m.title} ({m.releaseDate || "n/a"})
-                </li>
-              ))}
-            </ul>
+
+          <div>
+            <label htmlFor="pass" className="block text-sm font-medium">
+              Admin Passcode
+            </label>
+            <input
+              id="pass"
+              name="pass"
+              type="password"
+              className="border p-2 w-full"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              required
+              aria-required="true"
+              aria-describedby="pass-help"
+            />
+            <p id="pass-help" className="text-xs text-gray-700">Required</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!valid}
+            className={`px-3 py-2 rounded text-white ${
+              valid
+                ? "bg-black hover:bg-gray-800"
+                : "bg-gray-400 cursor-not-allowed"
+            }`}
+            aria-label="Create event"
+          >
+            Create Event
+          </button>
+
+          {msg && (
+            <p className="text-sm mt-2" role="status">
+              {msg}
+            </p>
           )}
-        </div>
-
-        {/* Manual fallback */}
-        <div>
-          <label className="block text-sm">TMDb Movie ID (optional)</label>
-          <input
-            className="border p-2 w-full"
-            value={form.movieId}
-            onChange={onChange("movieId")}
-            placeholder="e.g., 27205 for Inception"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">Admin Passcode</label>
-          <input
-            type="password"
-            className="border p-2 w-full"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-          />
-          <p className="text-xs text-gray-500">Required</p>
-        </div>
-
-        <button
-          type="submit"
-          disabled={!valid}
-          className={`px-3 py-2 rounded text-white ${
-            valid
-              ? "bg-black hover:bg-gray-800"
-              : "bg-gray-400 cursor-not-allowed"
-          }`}
-        >
-          Create Event
-        </button>
-
-        {msg && <p className="text-sm mt-2">{msg}</p>}
-      </form>
-    </main>
+        </form>
+      </main>
+    </>
   );
 }

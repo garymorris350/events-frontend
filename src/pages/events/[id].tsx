@@ -59,7 +59,6 @@ export default function EventDetailPage() {
   if (notFound) return <Custom404 />;
   if (!event) return <main className="max-w-xl mx-auto p-6">Loading…</main>;
 
-  // At this point event is guaranteed non-null
   const e = event!;
 
   async function onSubmit(ev: FormEvent<HTMLFormElement>) {
@@ -175,62 +174,91 @@ export default function EventDetailPage() {
       <form
         onSubmit={onSubmit}
         noValidate
+        aria-label="Event signup form"
         className="space-y-3 border p-4 rounded"
       >
         <div>
-          <label htmlFor="name" className="block text-sm">
-            Name
+          <label htmlFor="name" className="block text-sm font-medium">
+            Your Name
           </label>
           <input
             id="name"
+            name="name"
+            type="text"
+            required
+            aria-required="true"
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "name-error" : undefined}
             className="border p-2 w-full"
             value={name}
             onChange={(ev) => setName(ev.target.value)}
             autoComplete="name"
           />
-          {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
+          {errors.name && (
+            <p id="name-error" className="text-red-500 text-sm">
+              {errors.name}
+            </p>
+          )}
         </div>
+
         <div>
-          <label htmlFor="email" className="block text-sm">
-            Email
+          <label htmlFor="email" className="block text-sm font-medium">
+            Email Address
           </label>
           <input
             id="email"
+            name="email"
             type="email"
+            required
+            aria-required="true"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? "email-error" : undefined}
             className="border p-2 w-full"
             value={email}
             onChange={(ev) => setEmail(ev.target.value)}
             autoComplete="email"
           />
           {errors.email && (
-            <p className="text-red-500 text-sm">{errors.email}</p>
+            <p id="email-error" className="text-red-500 text-sm">
+              {errors.email}
+            </p>
           )}
         </div>
+
         <button
+          type="submit"
+          aria-label="Sign up for this event"
           className="px-3 py-2 bg-black text-white rounded disabled:opacity-60"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Submitting…" : "Sign Up"}
         </button>
+
         {msg && !errors.name && !errors.email && (
-          <p className="text-sm mt-2">{msg}</p>
+          <p className="text-sm mt-2" role="status">
+            {msg}
+          </p>
         )}
       </form>
 
       {msg === "Thanks for signing up!" && (
-        <div className="space-y-2">
+        <div className="space-y-2" aria-label="Calendar options">
           <p className="font-medium">Add this event to your calendar:</p>
           <div className="flex gap-3">
             <a
               href={googleUrl}
               target="_blank"
               rel="noreferrer"
+              role="link"
+              aria-label={`Add ${e.title} to your Google Calendar`}
               className="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700"
             >
               Google Calendar
             </a>
             <a
               href={icsUrl}
+              role="link"
+              aria-label={`Download ${e.title} as an iCalendar (.ics) file`}
               className="px-3 py-2 rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
             >
               Download .ics
