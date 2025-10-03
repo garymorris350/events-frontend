@@ -1,13 +1,17 @@
+// src/pages/index.tsx
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Head from "next/head";
-import { listEvents, type Event } from "@/lib/api";
+import { listEvents, type Event, deleteEvent } from "@/lib/api";
 import { formatDateTimeShort } from "@/lib/dates";
+import MoviePreview from "@/components/MoviePreview";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +37,28 @@ export default function EventsPage() {
       cancelled = true;
     };
   }, []);
+
+  async function handleDelete(id: string, title: string) {
+    // 1) Confirm intent
+    const ok = window.confirm(`Delete event "${title}"? This cannot be undone.`);
+    if (!ok) return;
+
+    // 2) Prompt for admin passcode
+    const adminPass = window.prompt("Enter admin passcode to delete:");
+    if (!adminPass || !adminPass.trim()) return;
+
+    try {
+      setDeletingId(id);
+      await deleteEvent(id, adminPass);
+      // 3) Optimistically remove from UI
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Delete failed";
+      alert(message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <>
@@ -66,22 +92,54 @@ export default function EventsPage() {
                   key={event.id}
                   className="bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition"
                 >
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                    {event.title}
-                  </h2>
-                  <p className="text-gray-700 mb-3">
-                    {event.start
-                      ? formatDateTimeShort(event.start)
-                      : "Date TBA"}{" "}
-                    — {event.location || "TBA"}
-                  </p>
-                  <Link
-                    href={`/events/${event.id}`}
-                    className="inline-block text-blue-700 font-medium hover:underline"
-                    aria-label={`View details for ${event.title}`}
-                  >
-                    View details →
-                  </Link>
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                    {/* Left: Event info */}
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                        {event.title}
+                      </h2>
+                      <p className="text-gray-700 mb-3">
+                        {event.start
+                          ? formatDateTimeShort(event.start)
+                          : "Date TBA"}{" "}
+                        — {event.location || "TBA"}
+                      </p>
+
+                      <div className="flex items-center gap-4">
+                        <Link
+                          href={`/events/${event.id}`}
+                          className="inline-block text-blue-700 font-medium hover:underline"
+                          aria-label={`View details for ${event.title}`}
+                        >
+                          View details →
+                        </Link>
+
+                        {/* Admin delete button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(event.id, event.title)}
+                          disabled={deletingId === event.id}
+                          className={`inline-flex items-center rounded px-3 py-1.5 text-sm font-medium transition
+                            ${deletingId === event.id
+                              ? "bg-red-300 text-white cursor-not-allowed"
+                              : "bg-red-600 text-white hover:bg-red-700"
+                            }`}
+                          aria-label={`Delete event ${event.title}`}
+                        >
+                          {deletingId === event.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Right: Movie preview or placeholder */}
+                    {event.movieId ? (
+                      <MoviePreview movieId={event.movieId} />
+                    ) : (
+                      <aside className="ml-4 shrink-0 rounded-lg border bg-gray-50 p-3 shadow-inner md:w-[220px] flex items-center justify-center text-sm text-gray-500">
+                        No film allocated
+                      </aside>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

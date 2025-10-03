@@ -37,8 +37,6 @@ export type Event = {
   updatedAt?: string;
 };
 
-
-
 export type CreateEventInput = {
   title: string;
   description: string;
@@ -108,7 +106,6 @@ export async function createEvent(
   }
   return (await r.json()) as Event;
 }
-
 
 /* =========================
    Signups / Checkout
@@ -189,3 +186,55 @@ export async function fetchMovie(id: string | number): Promise<TmdbMovie> {
 export function tmdbPosterUrl(posterPath: string | null, size: "w185" | "w342" | "w500" = "w342") {
   return posterPath ? `https://image.tmdb.org/t/p/${size}${posterPath}` : null;
 }
+
+/* =========================
+   Simplified Movie Basics
+   For event listings (title + poster thumbnail)
+   ========================= */
+
+export type MovieBasics = {
+  id: string;
+  title: string;
+  posterUrl?: string;
+  releaseDate?: string;
+};
+
+export async function getMovieBasics(movieId: string): Promise<MovieBasics | null> {
+  try {
+    const r = await fetch(`${BASE}/tmdb/movie/${movieId}`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return {
+      id: String(data.id),
+      title: data.title ?? data.name ?? "Untitled",
+      posterUrl: data.posterUrl ?? (data.posterPath ? tmdbPosterUrl(data.posterPath, "w185") ?? undefined : undefined),
+      releaseDate: data.release_date ?? data.releaseDate ?? data.first_air_date ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/* =========================
+   Delete event
+   ========================= */
+
+export async function deleteEvent(id: string, adminPass: string): Promise<void> {
+  if (!adminPass || !adminPass.trim()) {
+    throw new Error("Missing admin passcode (frontend)");
+  }
+  const r = await fetch(`${BASE}/events/${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-passcode": adminPass.trim() },
+  });
+  if (!r.ok) {
+    let message = "Delete event failed";
+    try {
+      const e = await r.json();
+      if (e?.error) message = typeof e.error === "string" ? e.error : JSON.stringify(e.error);
+    } catch {}
+    throw new Error(message);
+  }
+}
+
+
